@@ -599,7 +599,8 @@ void Paint_DrawString_CN(UWORD Xstart, UWORD Ystart, const char * pString, cFONT
             x += font->ASCII_Width;
         } else {        //Chinese
             for(Num = 0; Num < font->size; Num++) {
-                if((*p_text== font->table[Num].index[0]) && (*(p_text+1) == font->table[Num].index[1])) {
+                if((*p_text== font->table[Num].index[0]) && (*(p_text+1) == font->table[Num].index[1]) && 
+                    (*(p_text+2) == font->table[Num].index[2])) { // 新增对截止符的判断
                     const char* ptr = &font->table[Num].matrix[0];
 
                     for (j = 0; j < font->Height; j++) {
@@ -630,7 +631,7 @@ void Paint_DrawString_CN(UWORD Xstart, UWORD Ystart, const char * pString, cFONT
                 }
             }
             /* Point on the next character */
-            p_text += 2;
+            p_text += 3; // 新增截止符的长度
             /* Decrement the column position by 16 */
             x += font->Width;
         }
