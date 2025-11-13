@@ -9,7 +9,7 @@ Use GoodDisplay's ePaper drivers on ESP-IDF.
 
 其中[微雪电子](https://www.waveshare.net/)墨水屏驱动IDF适配版的开源地址是：[esp32-waveshare-epd-idf](https://github.com/sprlightning/esp32-waveshare-epd-idf)，经过对比，二者大部分相似，但GD的内容比微雪的较新；从bug上来说，微雪的驱动相对稳定。
 
-我使用的是GoodDisplay的2.13寸触摸屏（GDEY0213B74）和其配套的ESP32-L开发板，在使用GD的[GDEY0213B74驱动](https://github.com/gooddisplayshare/ESP32epdx/tree/main/examples/2-Colors%20(BW)/2.13/GDEY0213B74)时遇到的bug包括无法**正常显示中文字符串**，如“你好abc”会显示成“你  abc”，但是微雪的驱动却可以正常显示，我仔细对比了两边的驱动，发现微雪的中文字符串驱动比GD多对比了一组数据，也就是截止符，同样对应的字符索引应当+1，这是微雪能正常显示中文字符串的关键点；此外GD驱动的bug还有各种初始化函数调度混乱，存在过多不必要的休眠，还有就是刷新显示的时候黑白屏闪烁的情况相对严重，起初以为是过多的RST导致，但后来排除了这个原因，还是涉及到底层寄存器的操作，暂没深入研究。
+我使用的是GoodDisplay的2.13寸触摸屏（GDEY0213B74）和其配套的ESP32-L开发板，在使用GD的[GDEY0213B74驱动](https://github.com/gooddisplayshare/ESP32epdx/tree/main/examples/2-Colors%20(BW)/2.13/GDEY0213B74)时遇到的bug包括无法**正常显示中文字符串**，如“你好abc”会显示成“你  abc”，但是微雪的驱动却可以正常显示，我仔细对比了两边的驱动，发现微雪的中文字符串驱动比GD多对比了一组数据，也就是截止符，同样对应的字符索引应当+1，这是微雪能正常显示中文字符串的关键点（本仓库已修复此bug）；此外GD驱动的bug还有各种初始化函数调度混乱，存在过多不必要的休眠，还有就是刷新显示的时候黑白屏闪烁的情况相对严重，起初以为是过多的RST导致，但后来排除了这个原因，还是涉及到底层寄存器的操作，暂没深入研究。
 
 微雪显示时钟是调用函数**Paint_DrawTime**，其本质是将输入的时间转化为字符串存入一个简单的时钟数据结构，然后将时钟数据结构的内容通过英文字符串显示函数在局部进行更新；而GD驱动的一个好处是其有一个新增的时钟函数**EPD_Dis_Part_Time**，其通过调用新增的**EPD_Dis_Part_RAM**在局部刷新写入数据，可以非常流畅且连贯的更新时钟显示，时钟显示期间屏幕稳定且不闪烁，但是我仔细分析这个函数，发现它其实是预定义了一组数字的Image data，传入的数字会转化为Image data，本质上是在局部更新Image。而这个Image data存在于GD的Image.h头文件，本来想将GD的时钟函数移植到微雪的，但发现其显示的尺寸有点奇怪，试图显示较小的时钟尺寸时会发生字符错位，这种尺寸不通用的情况使我放弃了这个移植计划。当然这也表明了一件事，图片data的刷新可以做到屏幕不闪烁。但是这不是根本问题，我注意到同样的屏幕，微雪驱动在更新字符的时候却可以做到屏幕不闪烁，这是GD的驱动的bug之一，局部更新字符会出现屏幕黑白交替闪烁。
 
@@ -43,37 +43,6 @@ GD的每一款屏幕/总成都有对应的编号，如“GDEY0213B74”，根据
 
 开关**USE_GxEPD**控制**是否使用GoodDisplay的ESP32-L开发板**，其默认置1是启用GoodDisplay ESP32-L，如使用其它开发板如微雪的[电子墨水屏无线网络驱动板](https://www.waveshare.net/shop/e-Paper-ESP32-Driver-Board.htm)，需要将开关**USE_GxEPD**置0，否则会影响SPI和墨水屏控制IO的定义。同样的，如果你没有使用上述开发板，使用的是自定义板子，那请修改为实际IO值；
 
-注意到墨水屏在sleep后没法通过初始化唤醒，会停留在“e-Paper busy”，是因为唤醒需要分4步，先重置-再初始化-再加载图像cache-再创建并选择图像cache，我在EPD_2in13_V4.cpp预留了一个被注释的Awake Function，可根据需要将其复制到main.cpp中来启用；因为唤醒需要处理图像cache，所以需要在main.cpp的全局变量提前定义图像cache。示例如下：
-```cpp
-/******************************************************************************
-function :	Awake EPD from sleep mode
-parameter:
-info     :  This is an example of awake EPD, copy it to your main.cpp as a function
-******************************************************************************/
-void EPD_2in13_V4_Awake(void) {
-    Debug("Awake EPD...\r\n");
-    
-    // reset EPD
-    DEV_Digital_Write(EPD_RST_PIN, 0);
-    DEV_Delay_ms(10);
-    DEV_Digital_Write(EPD_RST_PIN, 1);
-    DEV_Delay_ms(10);
-    
-    // reinitialize EPD
-    EPD_2in13_V4_Init();
-    
-    // reload image cache(need to define the image cache in your main.cpp as global variable)
-    if (BlackImage == NULL) {
-        if((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL) 
-        {
-            Debug("Failed to apply for black memory...\r\n");
-            while (1);
-        }
-    }
-    Paint_NewImage(BlackImage, EPD_2in13_V4_WIDTH, EPD_2in13_V4_HEIGHT, 270, WHITE);
-    Paint_SelectImage(BlackImage);
-}
-```
 
 ## 字体
 
