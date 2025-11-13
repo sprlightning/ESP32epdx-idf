@@ -1,5 +1,5 @@
 #include "EPD_SPI.h"
-#include <SPI.h>
+#include "NeverUseArduino.h"
 
 //SPI write byte
 void SPI_Write(unsigned char value)

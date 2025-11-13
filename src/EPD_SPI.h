@@ -1,6 +1,7 @@
 #ifndef _EPD_SPI_H_
 #define _EPD_SPI_H_
-#include "Arduino.h"
+// #include "Arduino.h"
+#include "NeverUseArduino.h"
 
 //IO settings
 /*

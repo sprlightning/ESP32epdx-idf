@@ -1,11 +1,11 @@
 #ifndef _ESP32EPDX_H_
 #define _ESP32EPDX_H_
 
-#include <Arduino.h>
-#include <SPI.h>
+// #include "<Arduino.h>
+#include "NeverUseArduino.h"
 #include "EPD_SPI.h"
-#include "GUI/fonts.h"
-#include "GUI/GUI_Paint.h"
+#include "fonts.h"
+#include "GUI_Paint.h"
 
 
 
